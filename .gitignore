@@ -5,3 +5,6 @@
 **/.cache.json
 **/.claude-plugin/types/
 node_modules/
+
+# Files received from Telegram
+**/inbox/

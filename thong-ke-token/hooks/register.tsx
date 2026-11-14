@@ -10,6 +10,7 @@ const tele = atom(
   { shape: 'bridge-1' },
 )
 const teleOpen = atom({ plugin: 'thong-ke-token', key: 'teleOpen' } as const, 0)
+const allDays = atom({ plugin: 'thong-ke-token', key: 'allDays' } as const, false)
 const teleDot = (b: TeleBridge) =>
   !b.isOn ? '🔴' : b.lastError ? '🔴' : b.pairCode ? '🟡' : '🟢'
 
@@ -174,6 +175,41 @@ export const register: Register = on => {
 
     const monthName = `Tháng ${new Date(r?.monthStart ?? now).getMonth() + 1}`
 
+    // Daily chart: one bar per day, the last 7 days or the whole month.
+    const showAll = await read($, allDays)
+    const days = r?.days ?? []
+    const month = new Date(r?.monthStart ?? now).getMonth() + 1
+    const shown = days
+      .map((tokens, i) => ({ day: i + 1, tokens }))
+      .slice(showAll ? 0 : -7)
+    const peak = Math.max(1, ...shown.map(d => d.tokens))
+    const BAR = 12
+    const chart =
+      shown.length > 0 ? (
+        <Box flexDirection="column" marginBottom={1}>
+          <Box justifyContent="space-between">
+            <Text bold>Theo ngày</Text>
+            <Button
+              key="days-toggle"
+              label={showAll ? '7 ngày' : 'Cả tháng'}
+              onPress={() => void update($, allDays, v => !v)}
+            />
+          </Box>
+          {shown.map(d => {
+            const width = d.tokens > 0 ? Math.max(1, Math.round((d.tokens / peak) * BAR)) : 0
+            return (
+              <Box justifyContent="space-between">
+                <Text dimColor>{`${pad(d.day)}/${pad(month)}`}</Text>
+                <Box gap={1}>
+                  <Text color="cyan">{'█'.repeat(width) || '·'}</Text>
+                  <Text>{fmtNum(d.tokens).padStart(6)}</Text>
+                </Box>
+              </Box>
+            )
+          })}
+        </Box>
+      ) : null
+
     return (
       <Box flexDirection="column">
         {r
@@ -194,6 +230,8 @@ export const register: Register = on => {
               Row('Số phiên', String(r.month.sessions)),
             ])
           : null}
+
+        {chart}
 
         {r ? null : (
           <Box marginBottom={1}>

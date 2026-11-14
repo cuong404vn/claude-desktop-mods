@@ -12,7 +12,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const IDLE_MS = 5 * 60 * 1000 // a gap longer than this counts as idle
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3 // 3: each response carries its day of the month
 const ROOT = path.join(os.homedir(), '.claude', 'projects')
 // The cache sits in the mod's own folder (git-ignored), next to scripts/.
 const MOD_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -40,7 +40,7 @@ async function walk(dir, out) {
 // One file → its API responses since monthStart and its main-thread
 // timestamps, grouped by session id.
 async function readFile(file) {
-  const responses = [] // [key, sessionId, input, output, cacheRead, cacheWrite]
+  const responses = [] // [key, sessionId, input, output, cacheRead, cacheWrite, dayOfMonth]
   const times = {} // sessionId -> number[]
   const rl = createInterface({ input: createReadStream(file), crlfDelay: Infinity })
   for await (const line of rl) {
@@ -66,6 +66,7 @@ async function readFile(file) {
       u.output_tokens ?? 0,
       u.cache_read_input_tokens ?? 0,
       u.cache_creation_input_tokens ?? 0,
+      new Date(t).getDate(),
     ])
   }
   return { responses, times }
@@ -112,10 +113,12 @@ async function main() {
   const month = empty()
   const session = empty()
   const sessionTimes = {}
+  const days = new Array(now.getDate()).fill(0) // tokens per day, 1st..today
   for (const { responses, times } of Object.values(nextCache)) {
-    for (const [key, sid, i, o, cr, cw] of responses) {
+    for (const [key, sid, i, o, cr, cw, day] of responses) {
       if (seen.has(key)) continue
       seen.add(key)
+      if (day >= 1 && day <= days.length) days[day - 1] += i + o + cr + cw
       for (const b of sid === currentSession ? [month, session] : [month]) {
         b.input += i
         b.output += o
@@ -141,7 +144,7 @@ async function main() {
   } catch {}
 
   process.stdout.write(
-    JSON.stringify({ monthStart, scannedAt: Date.now(), month: { ...month, sessions }, session }),
+    JSON.stringify({ monthStart, scannedAt: Date.now(), month: { ...month, sessions }, session, days }),
   )
 }
 

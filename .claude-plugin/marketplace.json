@@ -17,7 +17,7 @@
     {
       "name": "tele-bridge",
       "source": "./tele-bridge",
-      "description": "Nhắn Telegram để giao việc cho phiên Claude khi vắng mặt / Control a Claude session from Telegram",
+      "description": "Điều khiển phiên Claude qua Telegram hoặc trang chat trên máy / Control Claude sessions from Telegram or a local chat page",
       "author": {
         "name": "Nguyễn Mạnh Cường",
         "url": "https://vidtools.net"
