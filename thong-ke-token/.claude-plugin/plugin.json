@@ -1,0 +1,13 @@
+{
+  "name": "thong-ke-token",
+  "version": "1.0.0",
+  "description": "Thống kê token & thời gian hoạt động (phiên này, từ đầu tháng), hạn mức tài khoản / Token & activity stats, account rate limits",
+  "author": {
+    "name": "Nguyễn Mạnh Cường",
+    "url": "https://vidtools.net"
+  },
+  "homepage": "https://github.com/cuong404vn/claude-desktop-mods",
+  "repository": "https://github.com/cuong404vn/claude-desktop-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

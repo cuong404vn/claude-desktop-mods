@@ -1,0 +1,7 @@
+# Secrets: never commit
+**/config.local.json
+
+# Generated / local
+**/.cache.json
+**/.claude-plugin/types/
+node_modules/

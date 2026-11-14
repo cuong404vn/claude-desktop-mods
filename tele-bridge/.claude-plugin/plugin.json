@@ -1,0 +1,13 @@
+{
+  "name": "tele-bridge",
+  "version": "1.0.0",
+  "description": "Nhắn Telegram để giao việc cho phiên Claude khi vắng mặt / Control a Claude session from Telegram",
+  "author": {
+    "name": "Nguyễn Mạnh Cường",
+    "url": "https://vidtools.net"
+  },
+  "homepage": "https://github.com/cuong404vn/claude-desktop-mods",
+  "repository": "https://github.com/cuong404vn/claude-desktop-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

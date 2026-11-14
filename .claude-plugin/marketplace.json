@@ -1,0 +1,30 @@
+{
+  "name": "claude-desktop-mods",
+  "owner": {
+    "name": "Nguyễn Mạnh Cường",
+    "url": "https://vidtools.net"
+  },
+  "plugins": [
+    {
+      "name": "thong-ke-token",
+      "source": "./thong-ke-token",
+      "description": "Thống kê token & thời gian hoạt động (phiên này, từ đầu tháng), hạn mức tài khoản / Token & activity stats, account rate limits",
+      "author": {
+        "name": "Nguyễn Mạnh Cường",
+        "url": "https://vidtools.net"
+      }
+    },
+    {
+      "name": "tele-bridge",
+      "source": "./tele-bridge",
+      "description": "Nhắn Telegram để giao việc cho phiên Claude khi vắng mặt / Control a Claude session from Telegram",
+      "author": {
+        "name": "Nguyễn Mạnh Cường",
+        "url": "https://vidtools.net"
+      }
+    }
+  ],
+  "metadata": {
+    "description": "Mod cho Claude Desktop / Claude Code: thống kê token và điều khiển qua Telegram. Mods for Claude Desktop / Claude Code: token stats and Telegram remote control."
+  }
+}
