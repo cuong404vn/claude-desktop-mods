@@ -76,7 +76,7 @@ Lệnh trong Claude: `/tele` mở cài đặt · `/tele on` · `/tele off` · `/
 
 ## Trang chat trên máy (không cần Telegram)
 
-Mod `tele-bridge` còn có một **trang chat chạy ngay trên máy bạn**: chọn phiên 🟢, nhắn tin, gửi ảnh/file, xem câu trả lời, giống giao diện chat.
+Mod `tele-bridge` còn có một **trang chat chạy ngay trên máy bạn**, bố cục giống app Claude: thanh bên liệt kê các phiên 🟢 (chấm cam nhấp nháy là phiên đang làm, chấm xanh dương là có tin mới), mỗi phiên là một cuộc trò chuyện riêng với **đầy đủ lịch sử**, kể cả những gì bạn gõ trực tiếp trên máy. Gửi được ảnh/file, câu trả lời hiển thị định dạng (chữ đậm, danh sách, bảng, code). Trên điện thoại, bấm ☰ để mở danh sách phiên.
 
 1. Bấm nút **Tele** → mục **🌐 Trang chat trên máy** → **Bật**. Cần ít nhất một phiên 🟢.
 2. Pane hiện địa chỉ, ví dụ `http://localhost:8787`, bấm **Mở** là vào.
@@ -160,7 +160,7 @@ Claude commands: `/tele` settings · `/tele on` · `/tele off` · `/token` stats
 
 ## Local chat page (no Telegram needed)
 
-`tele-bridge` also runs a **chat page on your own computer**: pick a 🟢 session, send messages, photos and files, read the answers.
+`tele-bridge` also runs a **chat page on your own computer**, laid out like the Claude app: a sidebar of the 🟢 sessions (a pulsing orange dot = working, a blue dot = new messages), each session its own conversation with its **full history**, including what you typed at the computer. Send photos and files; answers render formatting (bold, lists, tables, code). On a phone, tap ☰ for the session list.
 
 1. Click **Tele** → **🌐 Trang chat trên máy** (chat page) → **Bật** (On). At least one session must be 🟢.
 2. The pane shows the address, e.g. `http://localhost:8787`; click **Mở** (Open).

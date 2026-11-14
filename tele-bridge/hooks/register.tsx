@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { Bridge, Form, Mail, SessionEntry, WebInfo } from '../types'
 
@@ -157,21 +157,33 @@ async function send($: EngineInterface, text: string, extra: object = {}) {
 
 // ------------------------------------------------------------ chat page
 
-// Shows a message on the chat page (as Claude's answer, or a small note).
-async function webPush($: EngineInterface, text: string, role: 'claude' | 'info' = 'claude') {
+// Shows a small note in this session's chat on the page (stopped, status,
+// waiting for permission). Claude's answers need none: the page reads them
+// from the session's transcript, like everything typed at the computer.
+async function webNote($: EngineInterface, text: string) {
   const info = (await $.store.get('web')) as WebInfo | undefined
   if (!info) return
-  const { name = 'Claude' } = await read($, bridge)
   await $.http.fetch(`http://127.0.0.1:${info.port}/internal/push`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-key': info.key },
-    body: JSON.stringify({ sid: await $.session.id(), name, role, text }),
+    body: JSON.stringify({ sid: await $.session.id(), text }),
+  })
+}
+
+// Refreshes this session's live entry right away (the page's "đang làm").
+async function markBusy($: EngineInterface) {
+  const b = await read($, bridge)
+  if (!b.isOn) return
+  await $.store.set(`sess:${await $.session.id()}`, {
+    name: b.name ?? 'Claude',
+    at: await $.clock.now(),
+    busy: currentTurnId !== undefined,
   })
 }
 
 // Answers a remote message where it came from.
 async function reply($: EngineInterface, origin: Origin, text: string, extra: object = {}) {
-  if (origin === 'web') await webPush($, text, 'claude')
+  if (origin === 'web') await webNote($, text)
   else await send($, text, extra)
 }
 
@@ -221,13 +233,15 @@ async function sessionName($: EngineInterface): Promise<string> {
 }
 
 
-async function liveSessions($: EngineInterface): Promise<{ sid: string; name: string }[]> {
+async function liveSessions(
+  $: EngineInterface,
+): Promise<{ sid: string; name: string; busy: boolean }[]> {
   const now = await $.clock.now()
-  const out: { sid: string; name: string }[] = []
+  const out: { sid: string; name: string; busy: boolean }[] = []
   for (const key of await $.store.keys()) {
     if (!key.startsWith('sess:')) continue
     const s = (await $.store.get(key)) as SessionEntry | undefined
-    if (s && now - s.at < LIVE_MS) out.push({ sid: key.slice(5), name: s.name })
+    if (s && now - s.at < LIVE_MS) out.push({ sid: key.slice(5), name: s.name, busy: Boolean(s.busy) })
   }
   return out
 }
@@ -446,7 +460,7 @@ async function ensureWeb($: EngineInterface, me: string, loopId: string) {
 
   const info = (await $.store.get('web')) as WebInfo | undefined
   if (info?.sid === me) {
-    const sessions = (await liveSessions($)).map(s => ({ sid: s.sid, name: s.name }))
+    const sessions = await liveSessions($)
     await $.http.fetch(`http://127.0.0.1:${info.port}/internal/state`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-key': info.key },
@@ -493,7 +507,11 @@ async function loop($: EngineInterface, loopId: string) {
       const name = await sessionName($)
       if (name !== b.name) await setBridge($, x => ({ ...x, name }))
     }
-    await $.store.set(sessKey(me), { name: (await read($, bridge)).name ?? 'Claude', at: now })
+    await $.store.set(sessKey(me), {
+      name: (await read($, bridge)).name ?? 'Claude',
+      at: now,
+      busy: currentTurnId !== undefined,
+    })
     await drainMailbox($, me)
 
     // Mirror the chat page's addresses into this session's state (pane redraws).
@@ -782,85 +800,142 @@ export const register: Register = on => {
     const f = await read($, form)
     const b = await read($, bridge)
     const cfg = await readConfig($)
-    const ready = hasTelegram(cfg) || hasWeb(cfg)
-    const live = ready ? await liveSessions($) : []
+    const tele = hasTelegram(cfg)
     const web = cfg.web
-    const webUrls = b.webUrls ?? []
-    const webInfo = webUrls.length ? { urls: webUrls } : undefined
+    const webOn = Boolean(web?.enabled)
+    const urls = b.webUrls ?? []
+    const live = tele || webOn ? await liveSessions($) : []
     const active = (await $.store.get('active')) as string | undefined
     const activeName = live.find(s => s.sid === active)?.name
+    // Telegram's settings start open until it is set up.
+    const open = f.open ?? (tele ? undefined : 'tele')
+    const toggleOpen = (card: 'tele' | 'web') =>
+      void update($, form, x => ({ ...x, open: open === card ? undefined : card }))
+
+    // One line: what it is on the left, its control on the right.
+    const row = (key: string, left: RenderElement, right?: RenderElement | null) => (
+      <Box key={key} justifyContent="space-between" alignItems="center">
+        {left}
+        {right ?? null}
+      </Box>
+    )
+    const card = (key: string, children: (RenderElement | null)[]) => (
+      <Box key={key} flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+        {children}
+      </Box>
+    )
 
     return (
       <Box flexDirection="column" gap={1}>
-        <Box justifyContent="space-between">
-          <Text>
-            {b.isOn ? (b.lastError ? '🔴 Lỗi' : '🟢 Phiên này đang bật') : '🔴 Phiên này đang tắt'}
-          </Text>
-          {b.isOn ? (
-            <Button key="off" label="Tắt" onPress={() => void disable($)} />
-          ) : ready ? (
-            <Button key="on" label="Bật" onPress={() => void enable($)} />
-          ) : null}
-        </Box>
-        {b.lastError ? <Text color="red">{b.lastError}</Text> : null}
+        {card('card-session', [
+          row(
+            'r-on',
+            <Text bold>{b.isOn ? '🟢 Phiên này đang bật' : '🔴 Phiên này đang tắt'}</Text>,
+            b.isOn ? (
+              <Button key="off" label="Tắt" onPress={() => void disable($)} />
+            ) : tele || webOn ? (
+              <Button key="on" label="Bật" onPress={() => void enable($)} />
+            ) : null,
+          ),
+          b.isOn
+            ? row(
+                'r-notify',
+                <Text dimColor>
+                  {b.notifyAll ? '🔔 Báo cả việc giao trên máy' : '🔕 Chỉ báo việc giao từ xa'}
+                </Text>,
+                <Button
+                  key="notify-all"
+                  label={b.notifyAll ? 'Tắt' : 'Bật'}
+                  onPress={() => void setNotifyAll($, !b.notifyAll)}
+                />,
+              )
+            : null,
+          b.lastError ? <Text color="red">{b.lastError}</Text> : null,
+        ])}
 
-        {b.isOn ? (
-          <Box justifyContent="space-between">
+        {card('card-tele', [
+          row(
+            'r-tele',
             <Text>
-              {b.notifyAll ? '🔔 Báo cả việc giao trên máy' : '🔕 Chỉ báo việc giao từ Telegram'}
-            </Text>
+              <Text bold>✈️ Telegram </Text>
+              <Text dimColor>{tele ? '· đã cài' : '· chưa cài'}</Text>
+            </Text>,
             <Button
-              key="notify-all"
-              label={b.notifyAll ? 'Tắt' : 'Bật'}
-              onPress={() => void setNotifyAll($, !b.notifyAll)}
-            />
-          </Box>
-        ) : null}
+              key="tele-open"
+              label={open === 'tele' ? 'Thu gọn' : 'Cài đặt'}
+              onPress={() => toggleOpen('tele')}
+            />,
+          ),
+          tele && open !== 'tele' ? <Text dimColor>Đang trò chuyện: {activeName ?? 'chưa chọn'}</Text> : null,
+          open === 'tele' ? (
+            <Box flexDirection="column" gap={1}>
+              <Input
+                key="chat-id"
+                label="Chat ID"
+                placeholder="nhắn @userinfobot để lấy"
+                value={f.chatId}
+                submitLabel="lưu"
+                onInput={v => void update($, form, x => ({ ...x, chatId: v }))}
+                onSubmit={v => void update($, form, x => ({ ...x, chatId: v })).then(() => save($))}
+              />
+              <Input
+                key="token"
+                label="Bot token"
+                placeholder={
+                  cfg.botToken ? `${maskToken(cfg.botToken)} (để trống nếu giữ)` : 'lấy từ @BotFather'
+                }
+                value={f.token}
+                submitLabel="lưu"
+                onInput={v => void update($, form, x => ({ ...x, token: v }))}
+                onSubmit={v => void update($, form, x => ({ ...x, token: v })).then(() => save($))}
+              />
+              <Box gap={1} alignItems="center">
+                <Button key="save" label="Lưu" onPress={() => void save($)} />
+                {f.note ? <Text color={f.isError ? 'red' : 'green'}>{f.note}</Text> : null}
+              </Box>
+            </Box>
+          ) : null,
+        ])}
 
-        {ready ? (
-          <Box flexDirection="column">
-            <Text dimColor>Đang bật: {live.length ? live.map(s => s.name).join(', ') : 'không có'}</Text>
-            <Text dimColor>Telegram đang trò chuyện với: {activeName ?? 'chưa chọn'}</Text>
-          </Box>
-        ) : null}
-
-        <Box flexDirection="column">
-          <Box justifyContent="space-between">
-            <Text bold>🌐 Trang chat trên máy</Text>
+        {card('card-web', [
+          row(
+            'r-web',
+            <Text>
+              <Text bold>🌐 Trang chat </Text>
+              <Text dimColor>{webOn ? (urls.length ? '· đang chạy' : '· đang khởi động') : '· tắt'}</Text>
+            </Text>,
             <Button
               key="web-toggle"
-              label={web?.enabled ? 'Tắt' : 'Bật'}
-              onPress={() => void setWeb($, { enabled: !web?.enabled })}
-            />
-          </Box>
-          {web?.enabled ? (
-            webInfo ? (
-              webInfo.urls.map(u => (
-                <Box justifyContent="space-between">
-                  <Text>{u}</Text>
-                  <Button key={`open-${u}`} label="Mở" onPress={() => void openUrl($, u)} />
-                </Box>
-              ))
-            ) : (
-              <Text dimColor>Đang khởi động… (cần ít nhất một phiên 🟢)</Text>
-            )
-          ) : null}
-          {web?.enabled ? (
-            <Box flexDirection="column">
-              <Box justifyContent="space-between">
-                <Text>{web.lan ? '🏠 Cho máy khác cùng mạng nhà vào' : '🔒 Chỉ máy này'}</Text>
+              label={webOn ? 'Tắt' : 'Bật'}
+              onPress={() => void setWeb($, { enabled: !webOn })}
+            />,
+          ),
+          ...(webOn
+            ? urls.map(u =>
+                row(
+                  `r-${u}`,
+                  <Text>{u.replace('http://', '')}</Text>,
+                  <Button key={`open-${u}`} label="Mở" onPress={() => void openUrl($, u)} />,
+                ),
+              )
+            : []),
+          webOn
+            ? row(
+                'r-lan',
+                <Text dimColor>{web?.lan ? '🏠 Cả mạng nhà (có mật khẩu)' : '🔒 Chỉ máy này'}</Text>,
                 <Button
-                  key="web-lan"
-                  label={web.lan ? 'Tắt' : 'Bật'}
-                  onPress={() =>
-                    void setWeb($, { lan: !web.lan, password: f.webPassword?.trim() || web.password })
-                  }
-                />
-              </Box>
+                  key="web-open"
+                  label={open === 'web' ? 'Thu gọn' : 'Đổi'}
+                  onPress={() => toggleOpen('web')}
+                />,
+              )
+            : null,
+          webOn && open === 'web' ? (
+            <Box flexDirection="column" gap={1}>
               <Input
                 key="web-pass"
                 label="Mật khẩu"
-                placeholder={web.password ? 'đã đặt – nhập để đổi' : 'từ 6 ký tự, cho máy khác vào'}
+                placeholder={web?.password ? 'đã đặt (nhập để đổi)' : 'từ 6 ký tự'}
                 value={f.webPassword ?? ''}
                 submitLabel="lưu"
                 onInput={v => void update($, form, x => ({ ...x, webPassword: v }))}
@@ -870,51 +945,22 @@ export const register: Register = on => {
                   )
                 }
               />
-              <Text dimColor>
-                Chỉ dùng cho riêng bạn trong nhà: đừng đưa trang hay mật khẩu cho người khác (tài khoản
-                Claude là cá nhân). Không bật ở wifi công cộng.
-              </Text>
+              <Box gap={1} alignItems="center">
+                <Button
+                  key="web-lan"
+                  label={web?.lan ? 'Chỉ máy này' : 'Cho cả mạng nhà'}
+                  onPress={() =>
+                    void setWeb($, { lan: !web?.lan, password: f.webPassword?.trim() || web?.password })
+                  }
+                />
+                {f.note ? <Text color={f.isError ? 'red' : 'green'}>{f.note}</Text> : null}
+              </Box>
+              <Text dimColor>Không bật ở wifi công cộng.</Text>
             </Box>
-          ) : null}
-        </Box>
+          ) : null,
+        ])}
 
-        <Text bold>✈️ Telegram</Text>
-        <Box flexDirection="column">
-          <Input
-            key="chat-id"
-            label="Chat ID"
-            placeholder="vd 123456789"
-            value={f.chatId}
-            submitLabel="lưu"
-            onInput={v => void update($, form, x => ({ ...x, chatId: v }))}
-            onSubmit={v => void update($, form, x => ({ ...x, chatId: v })).then(() => save($))}
-          />
-          <Text dimColor>Lấy ID: nhắn @userinfobot trên Telegram.</Text>
-        </Box>
-
-        <Input
-          key="token"
-          label="Bot token"
-          placeholder={
-            cfg.botToken
-              ? `đang dùng ${maskToken(cfg.botToken)} – để trống nếu giữ`
-              : 'dán token từ @BotFather'
-          }
-          value={f.token}
-          submitLabel="lưu"
-          onInput={v => void update($, form, x => ({ ...x, token: v }))}
-          onSubmit={v => void update($, form, x => ({ ...x, token: v })).then(() => save($))}
-        />
-
-        <Box gap={1}>
-          <Button key="save" label="Lưu" onPress={() => void save($)} />
-          {f.note ? <Text color={f.isError ? 'red' : 'green'}>{f.note}</Text> : null}
-        </Box>
-
-        <Text dimColor>
-          Trên Telegram: /phien chọn phiên · /stop dừng · /status xem trạng thái. Chỉ tin nhắn gửi
-          từ Telegram mới được trả lời về Telegram.
-        </Text>
+        <Text dimColor>Chỉ dùng cho riêng bạn, không chia sẻ cho người khác.</Text>
       </Box>
     )
   })
@@ -940,6 +986,7 @@ export const register: Register = on => {
         remoteTurns.set(e.turnId, remoteTexts[i]!.origin)
         remoteTexts.splice(i, 1)
       }
+      void markBusy($).catch(() => undefined)
     }
     return next(e)
   })
@@ -948,6 +995,7 @@ export const register: Register = on => {
     const result = await next(e)
     if (e.agentId !== undefined) return result
     currentTurnId = undefined
+    void markBusy($).catch(() => undefined)
     const origin = remoteTurns.get(e.turnId)
     remoteTurns.delete(e.turnId)
     const b = await read($, bridge)
@@ -956,8 +1004,9 @@ export const register: Register = on => {
     const me = await $.session.id()
     const answer = result.text || e.answer
     if (origin === 'web') {
-      const head = e.isAborted ? '⏹ Đã dừng.\n' : e.reason === 'error' ? '⚠️ Lỗi khi chạy.\n' : ''
-      void webPush($, head + (answer || '(xong, không có nội dung trả lời)')).catch(() => undefined)
+      // The answer itself shows on the page from the transcript.
+      const note = e.isAborted ? '⏹ Đã dừng.' : e.reason === 'error' ? '⚠️ Lỗi khi chạy.' : ''
+      if (note) void webNote($, note).catch(() => undefined)
       return result
     }
     if (!origin) {

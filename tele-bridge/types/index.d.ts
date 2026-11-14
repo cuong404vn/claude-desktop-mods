@@ -13,7 +13,7 @@ export type Bridge = {
 }
 
 // What the 🟢 sessions keep in the shared store under `sess:<sessionId>`.
-export type SessionEntry = { name: string; at: number }
+export type SessionEntry = { name: string; at: number; busy?: boolean }
 
 // A Telegram message the polling session hands to another session.
 export type Mail = { kind: 'text' | 'stop' | 'status'; text?: string; origin?: 'tele' | 'web' }
@@ -28,6 +28,8 @@ export type Form = {
   isError?: boolean
   // The chat page's password, while being typed.
   webPassword?: string
+  // Which settings card is expanded in the pane.
+  open?: 'tele' | 'web'
 }
 
 declare module 'claude-code' {
