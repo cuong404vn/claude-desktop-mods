@@ -102,6 +102,20 @@ let myCwd = ''
 const remoteTexts: { text: string; origin: Origin }[] = []
 // Turn ids that answer a remote message, and where the answer goes.
 const remoteTurns = new Map<string, Origin>()
+// This mod's version from plugin.json, read once per load ("" when unknown).
+let version: string | undefined
+
+async function pluginVersion($: EngineInterface): Promise<string> {
+  if (version === undefined) {
+    try {
+      const m = JSON.parse(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`)) as { version?: unknown }
+      version = typeof m.version === 'string' ? m.version.trim() : ''
+    } catch {
+      version = ''
+    }
+  }
+  return version
+}
 
 // ---------------------------------------------------------------- config
 
@@ -799,7 +813,8 @@ async function openUrl($: EngineInterface, url: string) {
 const openPane = async ($: EngineInterface) => {
   const { chatId } = await readConfig($)
   await update($, form, f => ({ ...f, chatId: chatId === undefined ? f.chatId : String(chatId) }))
-  await $.ui.open({ id: PANE, title: TITLE })
+  const v = await pluginVersion($)
+  await $.ui.open({ id: PANE, title: v ? `${TITLE} v${v}` : TITLE })
 }
 
 // ------------------------------------------------------------- hooks
@@ -897,6 +912,7 @@ export const register: Register = on => {
     // Telegram's settings start open until it is set up.
     const open = f.open ?? (tele ? undefined : 'tele')
     const here = agentOf(myCwd, cfg.agentRoot)
+    const v = await pluginVersion($)
     const toggleOpen = (card: 'tele' | 'web' | 'agent') =>
       void update($, form, x => ({ ...x, open: open === card ? undefined : card }))
 
@@ -1095,6 +1111,7 @@ export const register: Register = on => {
         ])}
 
         <Text dimColor>Chỉ dùng cho riêng bạn, không chia sẻ cho người khác.</Text>
+        {v ? <Text key="version" dimColor>tele-bridge v{v}</Text> : null}
       </Box>
     )
   })
