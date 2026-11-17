@@ -84,6 +84,34 @@ Mod `tele-bridge` còn có một **trang chat chạy ngay trên máy bạn**, b�
 
 **Chỉ dùng cho riêng bạn.** Tài khoản Claude là cá nhân: không đưa trang hay mật khẩu cho người khác dùng, không mở trang ra Internet, không bật chế độ cùng mạng ở wifi công cộng. Trang chạy bằng http trong mạng nhà, tin nhắn không qua máy chủ bên ngoài nào.
 
+### Gom phiên theo agent (từ 1.6)
+
+Coi mỗi phiên Claude là một **agent**, mỗi agent một thư mục riêng, có thư mục chung để đọc dữ liệu chung. Trang chat gom tất cả lại cho dễ xem.
+
+```
+<thư mục tổng>/
+├── CLAUDE.md                ← luật chung cho mọi agent
+├── agents/
+│   ├── viet-content/        ← mở phiên Claude ở đây
+│   │   ├── CLAUDE.md        ← vai trò, nhiệm vụ của agent
+│   │   └── data/
+│   └── dang-bai/
+└── shared/                  ← dữ liệu chung
+    ├── tai-lieu/
+    └── hop-thu/<tên-agent>/ ← agent khác gửi việc: tạo file mới ở đây
+```
+
+1. Tạo cấu trúc như trên. Tên thư mục agent nên không dấu, không khoảng trắng.
+2. Mở phiên Claude trong `agents/<tên-agent>`. Mod tự nhận ra thư mục tổng và **tự bật 🟢** cho mọi phiên mở trong thư mục tổng, không cần bấm Tele. Muốn đặt tay: nút **Tele** → **🤖 Agent** → nhập đường dẫn thư mục tổng.
+3. Bật **🌐 Trang chat**. Thanh bên có:
+   - **📊 Tổng quan:** agent nào đang làm, đang bật, hoạt động lần cuối, câu trả lời mới nhất, số thư chưa xử lý.
+   - **Agent:** mỗi agent có 4 tab. **Chat** chọn phiên đang bật để nhắn, hoặc phiên cũ để xem lại. **Vai trò** hiện `CLAUDE.md`. **File** duyệt thư mục agent, xem trước ảnh, markdown, văn bản. **Hộp thư** là `shared/hop-thu/<tên-agent>/`.
+   - **🏠 Thư mục tổng:** phiên mở ở thư mục tổng, luật chung, file.
+   - **📁 Thư mục chung:** duyệt `shared/`.
+   - **Phiên khác 🟢:** phiên đang bật ở nơi khác, như trước.
+
+Tắt Tele ở một phiên agent thì phiên đó giữ 🔴, không tự bật lại. Trang chỉ **đọc** file, không sửa hay xoá gì.
+
 ## Giấy phép
 
 [MIT](LICENSE): dùng, sửa, chia sẻ thoải mái, giữ lại ghi công tác giả.
@@ -167,6 +195,34 @@ Claude commands: `/tele` settings · `/tele on` · `/tele off` · `/token` stats
 3. **From another device at home** (a mini PC, a phone on the same Wi-Fi): set a **password** (6+ characters), then turn on **🏠 Cho máy khác cùng mạng nhà vào** (allow devices on the home network). The pane adds an address like `http://192.168.1.5:8787`. Windows may ask once to let Node.js use the network: choose Private networks.
 
 **For your own use only.** A Claude account is personal: don't let other people use the page or share its password, don't expose it to the Internet, and don't enable network access on public Wi-Fi. The page uses plain http inside your home network; messages don't pass through any outside server.
+
+### Sessions grouped by agent (1.6+)
+
+Treat each Claude session as an **agent** with its own folder, plus a shared folder for common data. The chat page brings them together.
+
+```
+<root>/
+├── CLAUDE.md                ← rules for every agent
+├── agents/
+│   ├── writer/              ← open a Claude session here
+│   │   ├── CLAUDE.md        ← this agent's role and tasks
+│   │   └── data/
+│   └── publisher/
+└── shared/                  ← common data
+    ├── docs/
+    └── hop-thu/<agent>/     ← inbox: other agents drop new files here
+```
+
+1. Create the layout above (agent folder names without spaces work best).
+2. Open a Claude session in `agents/<agent>`. The mod finds the root by itself and **turns every session under the root 🟢 automatically**, no Tele press needed. To set it by hand: **Tele** → **🤖 Agent** → enter the root's path.
+3. Turn the **🌐 chat page** on. Its sidebar has:
+   - **📊 Overview:** which agents are working or on, last activity, latest answer, unread inbox files.
+   - **Agents:** each with four tabs. **Chat** picks a live session to talk to, or a closed one to read back. **Role** shows `CLAUDE.md`. **Files** browses the agent's folder with previews of images, markdown and text. **Inbox** is `shared/hop-thu/<agent>/`.
+   - **🏠 Root:** sessions opened in the root, the shared rules, files.
+   - **📁 Shared folder:** browse `shared/`.
+   - **Other 🟢 sessions:** live sessions elsewhere, as before.
+
+Turning Tele off in an agent session keeps it 🔴; it won't turn itself back on. The page only **reads** files; it never changes or deletes anything.
 
 ## License
 

@@ -16,6 +16,11 @@ import type { Bridge, Form, Mail, SessionEntry, WebInfo } from '../types'
 // hands each message to the chosen session through the shared store
 // (`msg:<sessionId>:<n>`). If the leader goes away, another 🟢 session takes
 // over. Settings (bot token, chat ID) live in config.local.json.
+//
+// Agents: an agent root is a folder holding `agents/<name>/` (one folder per
+// agent) and `shared/`. Sessions opened anywhere under it turn 🟢 by
+// themselves, and the chat page lists them by agent. The root is set in the
+// pane, or found from the first session opened in `…/agents/<name>`.
 
 const API = 'https://api.telegram.org/bot'
 const POLL_SECONDS = 10
@@ -39,7 +44,7 @@ const form = atom(
 )
 
 type WebConfig = { enabled: boolean; lan: boolean; password?: string; port?: number }
-type Config = { botToken?: string; chatId?: number; web?: WebConfig }
+type Config = { botToken?: string; chatId?: number; web?: WebConfig; agentRoot?: string }
 // Where a remote message came from, and so where its answer goes.
 type Origin = 'tele' | 'web'
 const WEB_PORT = 8787
@@ -91,6 +96,8 @@ const CHAT_RE = /^-?\d+$/
 
 // Per-process, per-session bookkeeping (a reload starts these over).
 let currentTurnId: string | undefined
+// The folder this session runs in (read at session.start).
+let myCwd = ''
 // Prompts submitted from Telegram or the chat page, not yet started.
 const remoteTexts: { text: string; origin: Origin }[] = []
 // Turn ids that answer a remote message, and where the answer goes.
@@ -114,6 +121,7 @@ async function readConfig($: EngineInterface): Promise<Config> {
     botToken: c.botToken && TOKEN_RE.test(c.botToken.trim()) ? c.botToken.trim() : undefined,
     chatId: typeof c.chatId === 'number' ? c.chatId : undefined,
     web: c.web && typeof c.web === 'object' ? c.web : undefined,
+    agentRoot: typeof c.agentRoot === 'string' && c.agentRoot.trim() ? c.agentRoot.trim() : undefined,
   }
 }
 
@@ -178,7 +186,8 @@ async function markBusy($: EngineInterface) {
     name: b.name ?? 'Claude',
     at: await $.clock.now(),
     busy: currentTurnId !== undefined,
-  })
+    cwd: myCwd,
+  } satisfies SessionEntry)
 }
 
 // Answers a remote message where it came from.
@@ -207,6 +216,7 @@ async function fileScript(
 const sessKey = (sid: string) => `sess:${sid}` // live entry, while the session runs
 const onKey = (sid: string) => `on:${sid}` // the person turned it 🟢: remembered across restarts
 const allKey = (sid: string) => `all:${sid}` // "báo cả việc giao trên máy" for this session
+const offKey = (sid: string) => `off:${sid}` // the person turned an agent session 🔴: it stays so
 const mailPrefix = (sid: string) => `msg:${sid}:`
 
 // A title an earlier version marked with 🟢 (that feature was removed: the
@@ -233,17 +243,84 @@ async function sessionName($: EngineInterface): Promise<string> {
 }
 
 
-async function liveSessions(
-  $: EngineInterface,
-): Promise<{ sid: string; name: string; busy: boolean }[]> {
+type LiveSession = { sid: string; name: string; busy: boolean; cwd: string }
+
+async function liveSessions($: EngineInterface): Promise<LiveSession[]> {
   const now = await $.clock.now()
-  const out: { sid: string; name: string; busy: boolean }[] = []
+  const out: LiveSession[] = []
   for (const key of await $.store.keys()) {
     if (!key.startsWith('sess:')) continue
     const s = (await $.store.get(key)) as SessionEntry | undefined
-    if (s && now - s.at < LIVE_MS) out.push({ sid: key.slice(5), name: s.name, busy: Boolean(s.busy) })
+    if (s && now - s.at < LIVE_MS) {
+      out.push({ sid: key.slice(5), name: s.name, busy: Boolean(s.busy), cwd: s.cwd ?? '' })
+    }
   }
   return out
+}
+
+// --------------------------------------------------------------- agents
+
+// Paths compared the way Windows does: either slash, any case.
+const slash = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+const isUnder = (p: string, base: string) => {
+  const a = slash(p).toLowerCase()
+  const b = slash(base).toLowerCase()
+  return a === b || a.startsWith(`${b}/`)
+}
+
+// `<root>/agents/<name>/…` → `<root>`.
+function rootFromCwd(cwd: string): string | undefined {
+  const parts = cwd.split(/[\\/]/)
+  for (let i = parts.length - 2; i > 0; i--) {
+    if (parts[i]!.toLowerCase() === 'agents' && parts[i + 1]) {
+      return parts.slice(0, i).join(cwd.includes('\\') ? '\\' : '/')
+    }
+  }
+  return undefined
+}
+
+// The agent a session opened in `cwd` belongs to: its name, '' anywhere
+// else under the root, undefined outside it.
+function agentOf(cwd: string, root?: string): string | undefined {
+  if (!root || !cwd || !isUnder(cwd, root)) return undefined
+  const rest = slash(cwd).slice(slash(root).length).split('/').filter(Boolean)
+  return rest[0]?.toLowerCase() === 'agents' && rest[1] ? rest[1] : ''
+}
+
+const baseName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
+
+// Whether this session turns 🟢 by itself: it runs under the agent root. The
+// first session opened in `…/agents/<name>` sets the root when none is set.
+async function autoOn($: EngineInterface): Promise<boolean> {
+  const cfg = await readConfig($)
+  if (!hasTelegram(cfg) && !hasWeb(cfg)) return false
+  let root = cfg.agentRoot
+  if (!root) {
+    root = rootFromCwd(myCwd)
+    if (!root) return false
+    await writeConfig($, { agentRoot: root })
+    $.ui.toast(`🤖 Thư mục tổng của các agent: ${root}`)
+  }
+  return agentOf(myCwd, root) !== undefined
+}
+
+async function setRoot($: EngineInterface, value: string) {
+  const v = value.trim().replace(/^"(.*)"$/, '$1').replace(/[\\/]+$/, '')
+  const note = (text: string, isError = false) =>
+    update($, form, x => ({ ...x, note: text, isError, rootInput: isError ? x.rootInput : '' }))
+  if (!v) {
+    await writeConfig($, { agentRoot: undefined })
+    return note('Đã bỏ thư mục tổng. Phiên mở trong …\\agents\\<tên> sẽ đặt lại.')
+  }
+  if (!/^([a-zA-Z]:[\\/]|[\\/])/.test(v)) return note('Cần đường dẫn đầy đủ, vd E:\\AI\\cong-ty', true)
+  if (!(await $.fs.exists(v).catch(() => false))) return note('Không thấy thư mục này trên máy.', true)
+  await writeConfig($, { agentRoot: v })
+  const hasAgents = await $.fs.exists(`${v}/agents`).catch(() => false)
+  await note(hasAgents ? 'Đã lưu.' : 'Đã lưu. Tạo thư mục agents\\ trong đó, mỗi agent một thư mục con.')
+  const cfg = await readConfig($)
+  if (!(await read($, bridge)).isOn && agentOf(myCwd, v) !== undefined && (hasTelegram(cfg) || hasWeb(cfg))) {
+    await enable($)
+  }
 }
 
 async function nameOf($: EngineInterface, sid: string) {
@@ -419,7 +496,9 @@ async function ensureWeb($: EngineInterface, me: string, loopId: string) {
     const key = Array.from(crypto.getRandomValues(new Uint8Array(16)), x => x.toString(16).padStart(2, '0')).join('')
     const stream = $.process.spawn({
       argv: ['node', `${$.plugin.root}/scripts/web-server.mjs`],
-      input: JSON.stringify({ port, lan: cfg.web.lan, password: cfg.web.password ?? '', key }) + '\n',
+      input:
+        JSON.stringify({ port, lan: cfg.web.lan, password: cfg.web.password ?? '', key, root: cfg.agentRoot ?? '' }) +
+        '\n',
     })
     const run: WebRun = { sig, loopId, stream }
     webRun = run
@@ -464,7 +543,7 @@ async function ensureWeb($: EngineInterface, me: string, loopId: string) {
     await $.http.fetch(`http://127.0.0.1:${info.port}/internal/state`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-key': info.key },
-      body: JSON.stringify({ sessions }),
+      body: JSON.stringify({ sessions, root: cfg.agentRoot ?? '' }),
     })
   }
 }
@@ -511,7 +590,8 @@ async function loop($: EngineInterface, loopId: string) {
       name: (await read($, bridge)).name ?? 'Claude',
       at: now,
       busy: currentTurnId !== undefined,
-    })
+      cwd: myCwd,
+    } satisfies SessionEntry)
     await drainMailbox($, me)
 
     // Mirror the chat page's addresses into this session's state (pane redraws).
@@ -597,7 +677,8 @@ async function enable($: EngineInterface) {
   const loopId = String(await $.clock.now()) + Math.random().toString(36).slice(2, 8)
   const name = await sessionName($)
   await $.store.set(onKey(me), true)
-  await $.store.set(sessKey(me), { name, at: await $.clock.now() })
+  await $.store.delete(offKey(me))
+  await $.store.set(sessKey(me), { name, at: await $.clock.now(), cwd: myCwd } satisfies SessionEntry)
   const active = (await $.store.get('active')) as string | undefined
   const live = await liveSessions($)
   if (!active || !live.some(s => s.sid === active)) await $.store.set('active', me)
@@ -625,7 +706,11 @@ async function disable($: EngineInterface, forget = true) {
   const me = await $.session.id()
   await setBridge($, b => ({ ...b, isOn: false, lastError: undefined }))
   stopWeb($)
-  if (forget) await $.store.delete(onKey(me))
+  if (forget) {
+    await $.store.delete(onKey(me))
+    // An agent session would turn 🟢 again by itself next time: remember no.
+    if (agentOf(myCwd, (await readConfig($)).agentRoot) !== undefined) await $.store.set(offKey(me), true)
+  }
   await $.store.delete(sessKey(me))
   const leader = (await $.store.get('leader')) as { sid: string } | undefined
   if (leader?.sid === me) await $.store.delete('leader')
@@ -741,9 +826,11 @@ export const register: Register = on => {
       },
     })
     // A session the person turned 🟢 comes back 🟢 (reload, app restart,
-    // reboot); a new session starts 🔴.
+    // reboot); a new session starts 🔴, unless it runs under the agent root.
     const me = await $.session.id()
+    myCwd = await $.session.cwd().catch(() => '')
     if (await $.store.get(onKey(me))) await enable($)
+    else if (!(await $.store.get(offKey(me))) && (await autoOn($).catch(() => false))) await enable($)
     else await setBridge($, b => ({ ...b, isOn: false }))
     return next(e)
   })
@@ -809,7 +896,8 @@ export const register: Register = on => {
     const activeName = live.find(s => s.sid === active)?.name
     // Telegram's settings start open until it is set up.
     const open = f.open ?? (tele ? undefined : 'tele')
-    const toggleOpen = (card: 'tele' | 'web') =>
+    const here = agentOf(myCwd, cfg.agentRoot)
+    const toggleOpen = (card: 'tele' | 'web' | 'agent') =>
       void update($, form, x => ({ ...x, open: open === card ? undefined : card }))
 
     // One line: what it is on the left, its control on the right.
@@ -956,6 +1044,52 @@ export const register: Register = on => {
                 {f.note ? <Text color={f.isError ? 'red' : 'green'}>{f.note}</Text> : null}
               </Box>
               <Text dimColor>Không bật ở wifi công cộng.</Text>
+            </Box>
+          ) : null,
+        ])}
+
+        {card('card-agent', [
+          row(
+            'r-agent',
+            <Text>
+              <Text bold>🤖 Agent </Text>
+              <Text dimColor>{cfg.agentRoot ? `· ${baseName(cfg.agentRoot)}` : '· chưa có thư mục tổng'}</Text>
+            </Text>,
+            <Button
+              key="agent-open"
+              label={open === 'agent' ? 'Thu gọn' : cfg.agentRoot ? 'Đổi' : 'Cài đặt'}
+              onPress={() => toggleOpen('agent')}
+            />,
+          ),
+          cfg.agentRoot && open !== 'agent' ? (
+            <Text dimColor>
+              {here === undefined ? 'Phiên này: ngoài thư mục tổng' : here ? `Phiên này: agent ${here}` : 'Phiên này: thư mục tổng'}
+            </Text>
+          ) : null,
+          open === 'agent' ? (
+            <Box flexDirection="column" gap={1}>
+              {cfg.agentRoot ? <Text dimColor>{cfg.agentRoot}</Text> : null}
+              <Input
+                key="agent-root"
+                label="Thư mục tổng"
+                placeholder="vd E:\AI\cong-ty (chứa agents\ và shared\)"
+                value={f.rootInput ?? ''}
+                submitLabel="lưu"
+                onInput={v => void update($, form, x => ({ ...x, rootInput: v }))}
+                onSubmit={v => void setRoot($, v)}
+              />
+              <Box gap={1} alignItems="center">
+                <Button key="agent-save" label="Lưu" onPress={() => void setRoot($, f.rootInput ?? '')} />
+                {myCwd ? (
+                  <Button key="agent-here" label="Dùng thư mục phiên này" onPress={() => void setRoot($, myCwd)} />
+                ) : null}
+                {cfg.agentRoot ? <Button key="agent-clear" label="Bỏ" onPress={() => void setRoot($, '')} /> : null}
+              </Box>
+              {f.note ? <Text color={f.isError ? 'red' : 'green'}>{f.note}</Text> : null}
+              <Text dimColor>
+                Mỗi agent một thư mục trong agents\, dữ liệu chung trong shared\. Phiên mở trong thư mục tổng tự bật 🟢
+                và hiện theo agent trên trang chat.
+              </Text>
             </Box>
           ) : null,
         ])}
