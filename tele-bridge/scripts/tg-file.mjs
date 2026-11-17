@@ -1,23 +1,26 @@
 // Moves files between Telegram and this computer for the tele-bridge mod.
-// Reads the bot token and chat ID from ../config.local.json (never argv).
+// Reads the bot token and chat ID from <dataDir>/config.local.json (never argv).
 //
-//   node tg-file.mjs download <file_id> <name>   → saves under ../inbox/, prints the path
-//   node tg-file.mjs send <path> [caption]        → sends the file to the saved chat
+//   node tg-file.mjs <dataDir> download <file_id> <name>   → saves under <dataDir>/inbox/, prints the path
+//   node tg-file.mjs <dataDir> send <path> [caption]        → sends the file to the saved chat
+//
+// <dataDir> is the mod's folder for settings and received files
+// (~/.claude/tele-bridge), outside the plugin's own folder, which an update
+// replaces.
 //
 // Prints one JSON line: { ok: true, path? } or { ok: false, error }.
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const MOD_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const INBOX = path.join(MOD_DIR, 'inbox')
+const DATA_DIR = process.argv[2] ?? ''
+const INBOX = path.join(DATA_DIR, 'inbox')
 const PHOTO_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 const MAX_UPLOAD = 50 * 1024 * 1024 // Telegram bot limit for documents
 
 const out = o => process.stdout.write(JSON.stringify(o))
 
 async function config() {
-  const c = JSON.parse(await fs.readFile(path.join(MOD_DIR, 'config.local.json'), 'utf8'))
+  const c = JSON.parse(await fs.readFile(path.join(DATA_DIR, 'config.local.json'), 'utf8'))
   if (!c.botToken || typeof c.chatId !== 'number') throw new Error('chưa cài bot (thiếu token hoặc Chat ID)')
   return c
 }
@@ -69,8 +72,9 @@ async function send(file, caption) {
   return abs
 }
 
-const [cmd, a, b] = process.argv.slice(2)
+const [, cmd, a, b] = process.argv.slice(2)
 try {
+  if (!path.isAbsolute(DATA_DIR)) throw new Error('thiếu thư mục dữ liệu của mod')
   if (cmd === 'download') out({ ok: true, path: await download(a, b) })
   else if (cmd === 'send') out({ ok: true, path: await send(a, b) })
   else throw new Error('lệnh không rõ')

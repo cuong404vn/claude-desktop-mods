@@ -12,7 +12,8 @@
 // shared folder, and an overview of all agents.
 //
 // Started by the mod with its settings as one JSON line on stdin:
-//   { port, lan, password, key, root }
+//   { port, lan, password, key, root, dataDir }
+// `dataDir`: where files sent from the page are saved (under inbox/).
 // `key` guards /internal/*, which only the mod calls (from 127.0.0.1).
 // Prints one JSON line when listening: { ready: true, urls: [...] }.
 //
@@ -25,7 +26,6 @@ import { createReadStream, promises as fs } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const MOD_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const INBOX = path.join(MOD_DIR, 'inbox')
 // CDM_PROJECTS_DIR is for testing against a copy of the transcripts.
 const PROJECTS = process.env.CDM_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects')
 const MAX_UPLOAD = 50 * 1024 * 1024
@@ -47,6 +47,8 @@ const PORT = Number(cfg.port) || 8787
 const LAN = Boolean(cfg.lan)
 const PASSWORD = String(cfg.password ?? '')
 const KEY = String(cfg.key ?? '')
+// Outside the plugin's folder, which an update replaces (an older mod sends none).
+const INBOX = path.join(typeof cfg.dataDir === 'string' && cfg.dataDir ? cfg.dataDir : MOD_DIR, 'inbox')
 
 let sessions = [] // [{ sid, name, busy, cwd }] pushed by the mod
 let root = typeof cfg.root === 'string' ? cfg.root : '' // the agent root set in the pane

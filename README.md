@@ -27,7 +27,7 @@ Hai nút nằm chung một hàng phía trên ô chat.
 ### Quyền riêng tư
 
 - **`thong-ke-token`** chỉ **đọc** lịch sử chat Claude lưu sẵn trên máy bạn (`~/.claude/projects`) để cộng token. Không gửi dữ liệu đi đâu. File cache nằm trong thư mục mod.
-- **`tele-bridge`** chỉ kết nối tới `api.telegram.org`. Bot token và Chat ID lưu trong `tele-bridge/config.local.json` **trên máy bạn**. Bot chỉ nhận lệnh từ đúng Chat ID đã lưu, tin nhắn của người khác bị bỏ qua.
+- **`tele-bridge`** chỉ kết nối tới `api.telegram.org`. Bot token, Chat ID và cài đặt trang chat lưu trong `~/.claude/tele-bridge/config.local.json` **trên máy bạn** (Windows: `C:\Users\<tên>\.claude\tele-bridge\`), nằm ngoài thư mục plugin nên cập nhật mod không làm mất. Bản 1.7.1 tự chuyển file cài đặt cũ sang đây. Bot chỉ nhận lệnh từ đúng Chat ID đã lưu, tin nhắn của người khác bị bỏ qua.
 
 ## Cài đặt
 
@@ -64,7 +64,7 @@ Cài xong, mở phiên chat mới (hoặc gõ `/reload-plugins`) là thấy nút
 **Chỉ việc giao từ Telegram mới được báo về Telegram.** Bạn chat trực tiếp trên máy (kể cả ở phiên đang 🟢) thì không có gì gửi lên Telegram. Một phiên bạn đã giao việc rồi chuyển sang phiên khác, khi làm xong vẫn báo `✅ [Tên phiên] đã xong`.
 
 **Gửi ảnh, file qua lại**
-- **Telegram → Claude:** gửi ảnh hoặc file cho bot (kèm chú thích nếu muốn). Mod lưu vào thư mục `tele-bridge/inbox` trên máy và báo Claude đường dẫn để Claude mở xem.
+- **Telegram → Claude:** gửi ảnh hoặc file cho bot (kèm chú thích nếu muốn). Mod lưu vào thư mục `~/.claude/tele-bridge/inbox` trên máy và báo Claude đường dẫn để Claude mở xem.
 - **Claude → Telegram:** nhờ Claude, ví dụ *"gửi file báo cáo này qua tele"* hay *"chụp màn hình rồi gửi tele cho tôi"*. Ảnh đến dạng ảnh, file khác dạng tài liệu (tối đa 50 MB).
 
 **Báo cả việc giao trên máy:** bạn giao việc dài ở máy rồi ra ngoài? Mở pane Telegram → **🔔 Báo cả việc giao trên máy → Bật**. Từ đó phiên này báo về Telegram mọi việc làm xong, kể cả việc bạn gõ ở máy. Về máy thì tắt đi.
@@ -145,7 +145,7 @@ The UI text is in Vietnamese.
 ### Privacy
 
 - **`thong-ke-token`** only **reads** the chat history Claude already stores on your machine (`~/.claude/projects`) to sum tokens. Nothing is sent anywhere. Its cache stays in the mod folder.
-- **`tele-bridge`** only talks to `api.telegram.org`. The bot token and Chat ID are stored in `tele-bridge/config.local.json` **on your machine**. The bot only accepts messages from the saved Chat ID; everyone else is ignored.
+- **`tele-bridge`** only talks to `api.telegram.org`. The bot token, Chat ID and chat-page settings are stored in `~/.claude/tele-bridge/config.local.json` **on your machine**, outside the plugin's folder, so updating the mod keeps them. Version 1.7.1 moves an older settings file there by itself. The bot only accepts messages from the saved Chat ID; everyone else is ignored.
 
 ## Install
 
@@ -176,7 +176,7 @@ Then start a new session (or run `/reload-plugins`).
 **Only work sent from Telegram is reported to Telegram.** Chatting at the computer (even in a 🟢 session) sends nothing. A session you gave a task to and then switched away from still reports `✅ [name] đã xong` (done) when it finishes.
 
 **Photos and files, both ways**
-- **Telegram → Claude:** send a photo or file to the bot (with a caption if you like). The mod saves it in `tele-bridge/inbox` on the computer and gives Claude the path.
+- **Telegram → Claude:** send a photo or file to the bot (with a caption if you like). The mod saves it in `~/.claude/tele-bridge/inbox` on the computer and gives Claude the path.
 - **Claude → Telegram:** ask Claude, e.g. *"send this report to Telegram"* or *"take a screenshot and send it to me on Telegram"*. Images arrive as photos, other files as documents (50 MB max).
 
 **Report work given at the computer too:** leaving a long task running? In the Telegram pane, turn **🔔 Báo cả việc giao trên máy** on: the session then reports every finished task to Telegram, including what you typed at the computer. Turn it off when you're back.

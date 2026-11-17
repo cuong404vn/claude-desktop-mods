@@ -15,7 +15,10 @@ import type { Bridge, Form, Mail, SessionEntry, WebInfo } from '../types'
 // sessions elect one "leader" (store key `leader`) that polls the bot and
 // hands each message to the chosen session through the shared store
 // (`msg:<sessionId>:<n>`). If the leader goes away, another 🟢 session takes
-// over. Settings (bot token, chat ID) live in config.local.json.
+// over. Settings (bot token, chat ID, chat page, agent root) live in
+// ~/.claude/tele-bridge/config.local.json, with the files received from
+// Telegram or the chat page under inbox/ beside it: outside the plugin's own
+// folder, which is named after its version and replaced by every update.
 //
 // Agents: an agent root is a folder holding `agents/<name>/` (one folder per
 // agent) and `shared/`. Sessions opened anywhere under it turn 🟢 by
@@ -119,11 +122,60 @@ async function pluginVersion($: EngineInterface): Promise<string> {
 
 // ---------------------------------------------------------------- config
 
-const configPath = ($: EngineInterface) => `${$.plugin.root}/config.local.json`
+// The mod's own folder for settings and received files: <CLAUDE_CONFIG_DIR
+// or ~/.claude>/tele-bridge. USERPROFILE before HOME, as Node's os.homedir().
+let dataDir: string | undefined
+async function dataDirOf($: EngineInterface): Promise<string> {
+  if (dataDir === undefined) {
+    const base = (await $.env.get('CLAUDE_CONFIG_DIR'))?.trim()
+    const home = (await $.env.get('USERPROFILE'))?.trim() || (await $.env.get('HOME'))?.trim()
+    dataDir = base ? `${base}/tele-bridge` : home ? `${home}/.claude/tele-bridge` : $.plugin.root
+  }
+  return dataDir
+}
+const CONFIG_FILE = 'config.local.json'
+const configPath = async ($: EngineInterface) => `${await dataDirOf($)}/${CONFIG_FILE}`
 
+// Before 1.7.1 the settings sat in the plugin's folder. An installed plugin
+// lives in <…>/tele-bridge/<version>/, so after an update they are in the
+// previous version's folder beside this one: the newest such file wins.
+async function legacyConfig($: EngineInterface): Promise<string | undefined> {
+  const root = $.plugin.root
+  const found: { file: string; at: number }[] = []
+  const add = async (file: string) => {
+    const st = await $.fs.stat(file).catch(() => undefined)
+    if (st?.kind === 'file') found.push({ file, at: st.mtimeMs })
+  }
+  await add(`${root}/${CONFIG_FILE}`)
+  const parent = root.replace(/[\\/]+[^\\/]*$/, '')
+  if (parent !== root && baseName(parent) === $.plugin.name) {
+    for (const d of await $.fs.list(parent).catch(() => [])) {
+      if (d.kind === 'dir' && slash(`${parent}/${d.name}`) !== slash(root)) await add(`${parent}/${d.name}/${CONFIG_FILE}`)
+    }
+  }
+  return found.sort((a, b) => b.at - a.at)[0]?.file
+}
+
+let migrated = false // looked for an old settings file in this load
 async function readRaw($: EngineInterface): Promise<Config> {
+  const file = await configPath($)
+  if (await $.fs.exists(file)) {
+    try {
+      return JSON.parse(await $.fs.read(file)) as Config
+    } catch {
+      return {}
+    }
+  }
+  if (migrated) return {}
+  migrated = true
+  // First run with the new place: bring the old settings over, once.
+  const old = await legacyConfig($).catch(() => undefined)
+  if (!old) return {}
   try {
-    return JSON.parse(await $.fs.read(configPath($))) as Config
+    const text = await $.fs.read(old)
+    const c = JSON.parse(text) as Config
+    await $.fs.write(file, text)
+    return c
   } catch {
     return {}
   }
@@ -142,7 +194,7 @@ async function readConfig($: EngineInterface): Promise<Config> {
 // Merges into what the file holds, so Telegram and chat-page settings keep each other.
 async function writeConfig($: EngineInterface, patch: Config) {
   const merged = { ...(await readRaw($)), ...patch }
-  await $.fs.write(configPath($), JSON.stringify(merged, null, 2))
+  await $.fs.write(await configPath($), JSON.stringify(merged, null, 2))
 }
 
 const hasTelegram = (c: Config) => c.botToken !== undefined && c.chatId !== undefined
@@ -216,7 +268,7 @@ async function fileScript(
   args: string[],
 ): Promise<{ ok: boolean; path?: string; error?: string }> {
   try {
-    const r = await $.process.run(['node', `${$.plugin.root}/scripts/tg-file.mjs`, ...args], {
+    const r = await $.process.run(['node', `${$.plugin.root}/scripts/tg-file.mjs`, await dataDirOf($), ...args], {
       timeoutMs: 120_000,
     })
     return JSON.parse(r.stdout || '{}') as { ok: boolean; path?: string; error?: string }
@@ -501,6 +553,8 @@ function stopWeb($: EngineInterface) {
 // list to the page.
 async function ensureWeb($: EngineInterface, me: string, loopId: string) {
   const cfg = await readConfig($)
+  // Read before the check below: nothing may wait between it and `webRun = run`.
+  const dir = await dataDirOf($)
   const sig = JSON.stringify(cfg.web ?? null)
   if (webRun && (!hasWeb(cfg) || webRun.sig !== sig || webRun.loopId !== loopId)) stopWeb($)
   if (!hasWeb(cfg) || !cfg.web) return
@@ -511,8 +565,14 @@ async function ensureWeb($: EngineInterface, me: string, loopId: string) {
     const stream = $.process.spawn({
       argv: ['node', `${$.plugin.root}/scripts/web-server.mjs`],
       input:
-        JSON.stringify({ port, lan: cfg.web.lan, password: cfg.web.password ?? '', key, root: cfg.agentRoot ?? '' }) +
-        '\n',
+        JSON.stringify({
+          port,
+          lan: cfg.web.lan,
+          password: cfg.web.password ?? '',
+          key,
+          root: cfg.agentRoot ?? '',
+          dataDir: dir,
+        }) + '\n',
     })
     const run: WebRun = { sig, loopId, stream }
     webRun = run
