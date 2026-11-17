@@ -104,8 +104,8 @@ Coi mỗi phiên Claude là một **agent**, mỗi agent một thư mục riêng
 1. Tạo cấu trúc như trên. Tên thư mục agent nên không dấu, không khoảng trắng.
 2. Mở phiên Claude trong `agents/<tên-agent>`. Mod tự nhận ra thư mục tổng và **tự bật 🟢** cho mọi phiên mở trong thư mục tổng, không cần bấm Tele. Muốn đặt tay: nút **Tele** → **🤖 Agent** → nhập đường dẫn thư mục tổng.
 3. Bật **🌐 Trang chat**. Thanh bên có:
-   - **📊 Tổng quan:** agent nào đang làm, đang bật, hoạt động lần cuối, câu trả lời mới nhất, số thư chưa xử lý.
-   - **Agent:** mỗi agent có 4 tab. **Chat** chọn phiên đang bật để nhắn, hoặc phiên cũ để xem lại. **Vai trò** hiện `CLAUDE.md`. **File** duyệt thư mục agent, xem trước ảnh, markdown, văn bản. **Hộp thư** là `shared/hop-thu/<tên-agent>/`.
+   - **📊 Tổng quan:** đầu trang là **🔔 Cần bạn xem**: các phiên đã trả lời xong mà bạn chưa đọc, kèm câu trả lời cuối, bấm vào là tới phiên đó (số ở cạnh chữ Tổng quan và trên tab trình duyệt là số phiên đang chờ). Dưới đó là agent nào đang làm, đang bật, hoạt động lần cuối, số thư chưa xử lý.
+   - **Agent:** các phiên 🟢 của agent hiện ngay dưới tên agent, mỗi phiên một dòng (chấm cam nhấp nháy: đang làm; chấm xanh dương: có tin mới), bấm là chuyển phiên. Phiên đã đóng nằm trong mục **Lịch sử** dưới agent đang xem, để đọc lại. Mỗi agent có 4 tab. **Chat** nhắn với phiên đang chọn. **Vai trò** hiện `CLAUDE.md`. **File** duyệt thư mục agent, xem trước ảnh, markdown, văn bản. **Hộp thư** là `shared/hop-thu/<tên-agent>/`.
    - **🏠 Thư mục tổng:** phiên mở ở thư mục tổng, luật chung, file.
    - **📁 Thư mục chung:** duyệt `shared/`.
    - **Phiên khác 🟢:** phiên đang bật ở nơi khác, như trước.
@@ -216,8 +216,8 @@ Treat each Claude session as an **agent** with its own folder, plus a shared fol
 1. Create the layout above (agent folder names without spaces work best).
 2. Open a Claude session in `agents/<agent>`. The mod finds the root by itself and **turns every session under the root 🟢 automatically**, no Tele press needed. To set it by hand: **Tele** → **🤖 Agent** → enter the root's path.
 3. Turn the **🌐 chat page** on. Its sidebar has:
-   - **📊 Overview:** which agents are working or on, last activity, latest answer, unread inbox files.
-   - **Agents:** each with four tabs. **Chat** picks a live session to talk to, or a closed one to read back. **Role** shows `CLAUDE.md`. **Files** browses the agent's folder with previews of images, markdown and text. **Inbox** is `shared/hop-thu/<agent>/`.
+   - **📊 Overview:** it opens with **🔔 Needs you**: sessions that finished answering since you last read them, with the last answer; tap one to jump there (the count beside Overview and in the browser tab is how many wait). Below: which agents are working or on, last activity, unread inbox files.
+   - **Agents:** an agent's 🟢 sessions sit right under its name, one row each (pulsing orange: working; blue dot: new messages); tap to switch. Closed sessions are under **Lịch sử** (history) beneath the agent you're viewing, to read back. Each agent has four tabs. **Chat** talks to the selected session. **Role** shows `CLAUDE.md`. **Files** browses the agent's folder with previews of images, markdown and text. **Inbox** is `shared/hop-thu/<agent>/`.
    - **🏠 Root:** sessions opened in the root, the shared rules, files.
    - **📁 Shared folder:** browse `shared/`.
    - **Other 🟢 sessions:** live sessions elsewhere, as before.

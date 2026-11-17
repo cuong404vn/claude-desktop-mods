@@ -248,6 +248,8 @@ function hub() {
 }
 
 async function build() {
+  // When this snapshot was taken: activity after it shows in the next one.
+  const now = Date.now()
   const r = agentRoot()
   const groups = new Map() // 'a:<name>' | 'root' | 'other' -> Map(sid -> entry)
   const group = key => {
@@ -339,6 +341,7 @@ async function build() {
   }
   agents.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
   return {
+    now,
     root: r,
     rootName: r ? path.basename(r) : '',
     hasShared: r ? await exists(path.join(r, 'shared')) : false,
@@ -622,6 +625,11 @@ code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:13px}
 .dot.busy{background:var(--accent);animation:pulse 1s infinite}
 .unread{width:8px;height:8px;border-radius:50%;background:#3b82f6;flex:0 0 8px}
 .badge{font-size:11px;background:var(--accent);color:#fff;border-radius:999px;padding:0 6px;line-height:18px}
+.cnt{font-size:11px;background:#3b82f6;color:#fff;border-radius:999px;padding:0 6px;line-height:18px}
+.item.sub{padding:4px 10px 4px 24px;font-size:14px}
+.item.sub .dot{width:7px;height:7px;flex-basis:7px}
+.item.hist{color:var(--dim)}
+.item.on.par{background:none}
 @keyframes pulse{50%{opacity:.3}}
 #side .foot{font-size:12px;color:var(--dim);padding:12px 16px;border-top:1px solid var(--line)}
 #main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
@@ -633,7 +641,8 @@ header button{padding:6px 10px}header button:hover{background:var(--hover)}
 .tab{padding:9px 12px;border-radius:0;border-bottom:2px solid transparent;white-space:nowrap;color:var(--dim)}
 .tab:hover{color:var(--text)}.tab.on{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
 .sbar{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.sbar select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:100%;min-width:0;flex:1 1 260px}
+.sbar .sname{flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mob{display:none}
 #log{flex:1;overflow-y:auto}
 #inner{max-width:760px;margin:0 auto;padding:24px 16px 8px;display:flex;flex-direction:column;gap:18px}
 #inner.wide{max-width:980px;gap:12px}
@@ -659,7 +668,7 @@ header button{padding:6px 10px}header button:hover{background:var(--hover)}
 .frow{display:flex;gap:10px;align-items:center;width:100%;padding:9px 14px;border-radius:0;border-bottom:1px solid var(--line);text-align:left}
 .frow:last-child{border-bottom:0}.frow:hover{background:var(--hover)}
 .frow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.meta{color:var(--dim);font-size:12px;white-space:nowrap}
+.meta{color:var(--dim);font-size:12px;white-space:nowrap}.meta.wrap{white-space:normal}
 .preview img{max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:120px;flex:1 1 120px}
@@ -672,6 +681,11 @@ header button{padding:6px 10px}header button:hover{background:var(--hover)}
 .pill{font-size:12px;padding:1px 9px;border-radius:999px;background:var(--hover);color:var(--dim);white-space:nowrap}
 .pill.busy{background:var(--accent);color:#fff}.pill.on{background:var(--okbg);color:var(--ok)}
 .btn{border:1px solid var(--line);padding:4px 10px;font-size:13px;background:var(--panel)}.btn:hover{background:var(--hover)}
+.sec{display:flex;align-items:center;gap:8px;margin-top:4px}.sec .grow{flex:1}
+.frow.todo{align-items:flex-start}.frow.todo .unread{margin-top:8px}
+.frow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.row1{display:flex;gap:8px;align-items:baseline;min-width:0}.row1 b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snip1{color:var(--dim);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 footer{padding:8px 16px calc(14px + env(safe-area-inset-bottom))}
 .box{max-width:760px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px}
 .ro{max-width:760px;margin:0 auto;padding:10px 14px;border:1px dashed var(--line);border-radius:12px;color:var(--dim);font-size:14px;text-align:center}
@@ -687,7 +701,7 @@ textarea{flex:1;min-width:0;resize:none;border:0;outline:0;background:none;color
   #side{position:fixed;z-index:10;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .2s}
   body.open #side{transform:none}
   body.open #scrim{display:block;position:fixed;inset:0;background:#0006;z-index:9}
-  #menu{display:block}
+  #menu{display:block}.mob{display:inline-block}
   #inner{padding:16px 12px 8px}
 }
 </style></head><body>
@@ -708,7 +722,11 @@ textarea{flex:1;min-width:0;resize:none;border:0;outline:0;background:none;color
 <script>
 const $=id=>document.getElementById(id);
 const keep={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-let hub=null,view=keep.get('cdm_view2',{type:'overview'}),seen=keep.get('cdm_seen2',{}),pending=[],busy=false,rendered='',sbarHtml='';
+let hub=null,view=keep.get('cdm_view2',{type:'overview'}),seen=keep.get('cdm_seen2',{}),pending=[],busy=false,rendered='',sbarHtml='',sideHtml='';
+// hist: which places have their closed sessions ("Lịch sử") expanded. lastPoll:
+// the server's time at the page's last look, so a session that first shows up
+// with newer activity counts as unread.
+let hist=keep.get('cdm_hist',{}),lastPoll=keep.get('cdm_poll',0);
 function show(logged){$('login').classList.toggle('hidden',logged);$('side').classList.toggle('hidden',!logged);$('main').classList.toggle('hidden',!logged)}
 async function api(path,opts){const r=await fetch(path,opts);if(r.status===401){show(false);throw new Error('login')}return r.json()}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -739,6 +757,14 @@ const isChat=()=>view.type==='session'||((view.type==='agent'||view.type==='root
 function sessionsOf(v){if(!hub)return[];if(v.type==='agent'){const a=hub.agents.find(x=>x.name===v.name);return a?a.sessions:[]}if(v.type==='root')return hub.rootSessions;if(v.type==='session')return hub.others;return[]}
 function curSession(){const list=sessionsOf(view);const s=list.find(x=>x.sid===view.sid);if(view.type==='session')return s||null;return s||list[0]||null}
 const allSessions=()=>hub?[].concat(...hub.agents.map(a=>a.sessions),hub.rootSessions,hub.others):[];
+// Every session with the view that opens it and where it belongs.
+function placed(){if(!hub)return[];const out=[];
+  for(const a of hub.agents)for(const s of a.sessions)out.push({s,v:{type:'agent',name:a.name,sid:s.sid},where:'🤖 '+a.name});
+  for(const s of hub.rootSessions)out.push({s,v:{type:'root',sid:s.sid},where:'🏠 '+(hub.rootName||'Thư mục tổng')});
+  for(const s of hub.others)out.push({s,v:{type:'session',sid:s.sid},where:'Phiên khác'});
+  return out}
+// Sessions that answered and wait for you to read it (not still working).
+const todo=()=>placed().filter(x=>isUnread(x.s)&&!x.s.busy).sort((a,b)=>b.s.at-a.s.at);
 function isUnread(s){const cur=isChat()&&curSession();return(s.sid in seen)&&s.n>seen[s.sid]&&!(cur&&cur.sid===s.sid)}
 function go(v){view={type:v.type};if(v.name)view.name=v.name;if(v.sid)view.sid=v.sid;view.tab=v.tab||(v.type==='shared'?'files':'chat');save();rendered='';sbarHtml='';document.body.classList.remove('open');render(true)}
 function fixView(){
@@ -751,16 +777,43 @@ function fixView(){
 
 // ---- sidebar
 function navItem(on,go,attrs,icon,name,extra){return'<button class="item'+(on?' on':'')+'" data-go="'+go+'"'+attrs+'>'+icon+'<span class="nm">'+esc(name)+'</span>'+(extra||'')+'</button>'}
+const dotOf=s=>'<span class="dot'+(s.busy?' busy':s.live?'':' off')+'"></span>';
+// Whether the view shows this place (an agent, the root), whatever the tab.
+const inPlace=v=>view.type===v.type&&(v.name||'')===(view.name||'');
+// The session open in the chat right now, if it belongs to place v.
+const openIn=v=>inPlace(v)&&isChat()&&curSession();
+// A session's name; one with no message yet is named after its folder,
+// which says nothing under that folder's own row.
+const nameOf=s=>!s.n&&hub&&(s.name===view.name||s.name===hub.rootName||hub.agents.some(a=>a.name===s.name))?'Phiên mới, chưa nhắn gì':s.name;
+// One session under its place: its state, name, age when closed, unread.
+function sessRow(s,v){
+  const cur=openIn(v),on=cur&&cur.sid===s.sid;
+  return'<button class="item sub'+(on?' on':'')+'" data-go="'+v.type+'"'+(v.name?' data-name="'+esc(v.name)+'"':'')+' data-sid="'+esc(s.sid)+'" title="'+esc(nameOf(s))+'">'+dotOf(s)+'<span class="nm">'+esc(nameOf(s))+'</span>'+(s.live?'':'<span class="meta">'+ago(s.at)+'</span>')+(isUnread(s)?'<span class="unread"></span>':'')+'</button>';
+}
+// A place's sessions: the 🟢 ones always, the closed ones under "Lịch sử"
+// while you are in that place (open by default when you read one of them).
+function subTree(list,v,key){
+  const h=list.filter(s=>s.live).map(s=>sessRow(s,v)),old=list.filter(s=>!s.live);
+  if(inPlace(v)&&old.length){
+    const cur=openIn(v),open=key in hist?hist[key]:Boolean(cur&&!cur.live);
+    h.push('<button class="item sub hist" data-hist="'+esc(key)+'" data-open="'+(open?1:0)+'"><span class="ic">'+(open?'▾':'▸')+'</span><span class="nm">Lịch sử</span><span class="meta">'+old.length+' phiên</span></button>');
+    if(open)for(const s of old)h.push(sessRow(s,v));
+  }
+  return h.join('');
+}
 function renderSide(){
-  if(!hub)return;const h=[];
+  if(!hub)return;const h=[];const waiting=todo().length;
   if(hub.root){
-    h.push(navItem(view.type==='overview','overview','','<span class="ic">📊</span>','Tổng quan'));
+    h.push(navItem(view.type==='overview','overview','','<span class="ic">📊</span>','Tổng quan',waiting?'<span class="cnt" title="Cần bạn xem">'+waiting+'</span>':''));
     h.push('<div class="label">Agent</div>');
     if(!hub.agents.length)h.push('<div class="hint">Chưa có agent: tạo thư mục trong <code>agents/</code>.</div>');
-    for(const a of hub.agents){const dot='<span class="dot'+(a.busy?' busy':a.live?'':' off')+'"></span>';
-      h.push(navItem(view.type==='agent'&&view.name===a.name,'agent',' data-name="'+esc(a.name)+'"',dot,a.name,(a.mail?'<span class="badge" title="Thư chưa xử lý">'+a.mail+'</span>':'')+(a.sessions.some(isUnread)?'<span class="unread"></span>':'')))}
+    for(const a of hub.agents){const v={type:'agent',name:a.name},dot='<span class="dot'+(a.busy?' busy':a.live?'':' off')+'"></span>';
+      h.push('<button class="item'+(inPlace(v)?' on':'')+(openIn(v)?' par':'')+'" data-go="agent" data-name="'+esc(a.name)+'">'+dot+'<span class="nm">'+esc(a.name)+'</span>'+(a.mail?'<span class="badge" title="Thư chưa xử lý">'+a.mail+'</span>':'')+(a.sessions.some(isUnread)?'<span class="unread"></span>':'')+'</button>');
+      h.push(subTree(a.sessions,v,'a:'+a.name))}
     h.push('<div class="label">Thư mục</div>');
-    h.push(navItem(view.type==='root','root','','<span class="ic">🏠</span>',hub.rootName||'Thư mục tổng',hub.rootSessions.some(s=>s.live)?'<span class="dot'+(hub.rootSessions.some(s=>s.busy)?' busy':'')+'"></span>':''));
+    const rv={type:'root'};
+    h.push('<button class="item'+(inPlace(rv)?' on':'')+(openIn(rv)?' par':'')+'" data-go="root"><span class="ic">🏠</span><span class="nm">'+esc(hub.rootName||'Thư mục tổng')+'</span>'+(hub.rootSessions.some(isUnread)?'<span class="unread"></span>':'')+'</button>');
+    h.push(subTree(hub.rootSessions,rv,'root'));
     if(hub.hasShared)h.push(navItem(view.type==='shared','shared','','<span class="ic">📁</span>','Thư mục chung'));
   }
   if(hub.others.length||!hub.root){
@@ -768,9 +821,18 @@ function renderSide(){
     if(!hub.others.length)h.push('<div class="hint">Chưa có phiên nào bật.</div>');
     for(const s of hub.others)h.push(navItem(view.type==='session'&&view.sid===s.sid,'session',' data-sid="'+esc(s.sid)+'"','<span class="dot'+(s.busy?' busy':'')+'"></span>',s.name,isUnread(s)?'<span class="unread"></span>':''));
   }
-  $('list').innerHTML=h.join('');
+  document.title=(waiting?'('+waiting+') ':'')+'Claude Chat';
+  // On a phone the list hides behind ☰: say there that something waits.
+  const menu='☰'+(waiting?' <span class="cnt">'+waiting+'</span>':'');if($('menu').innerHTML!==menu)$('menu').innerHTML=menu;
+  const html=h.join('');if(html===sideHtml)return;
+  $('list').innerHTML=html;sideHtml=html;
   $('foot').textContent=hub.root?'Phiên mở trong thư mục tổng tự hiện ở đây. Chỉ dùng cho riêng bạn.':'Bật thêm phiên: trên máy, bấm nút Tele trong phiên đó. Chỉ dùng cho riêng bạn.';
-  for(const b of $('list').querySelectorAll('[data-go]'))b.onclick=()=>go({type:b.dataset.go,name:b.dataset.name,sid:b.dataset.sid});
+  for(const b of $('list').querySelectorAll('[data-go]'))b.onclick=()=>{
+    const v={type:b.dataset.go,name:b.dataset.name,sid:b.dataset.sid};
+    // The place's own row keeps the session you were reading there.
+    if(!v.sid&&inPlace(v)&&view.sid)v.sid=view.sid;
+    go(v)};
+  for(const b of $('list').querySelectorAll('[data-hist]'))b.onclick=()=>{hist[b.dataset.hist]=b.dataset.open!=='1';keep.set('cdm_hist',hist);renderSide()};
 }
 
 // ---- header, tabs, session picker
@@ -794,12 +856,13 @@ function mailOf(){if(!hub||view.type!=='agent')return 0;const a=hub.agents.find(
 function renderSbar(){
   const on=isChat()&&view.type!=='session';
   $('sbar').classList.toggle('hidden',!on);if(!on)return;
+  // The session being read; you switch sessions in the list on the left.
   const list=sessionsOf(view),cur=curSession();
-  const h=list.length?'<select id="pick" title="Chọn phiên">'+list.map(s=>'<option value="'+esc(s.sid)+'"'+(cur&&s.sid===cur.sid?' selected':'')+'>'+(s.busy?'⏳ ':s.live?'🟢 ':'⚪ ')+esc(s.name)+' · '+ago(s.at)+(isUnread(s)?' •':'')+'</option>').join('')+'</select><span class="meta">'+list.filter(s=>s.live).length+' đang bật · '+list.length+' phiên</span>'
+  const h=cur?'<span class="pill'+(cur.busy?' busy':cur.live?' on':'')+'">'+(cur.busy?'Đang làm':cur.live?'Đang bật':'Đã đóng')+'</span><b class="sname" title="'+esc(nameOf(cur))+'">'+esc(nameOf(cur))+'</b><span class="meta">'+(cur.at?ago(cur.at)+' · ':'')+list.filter(s=>s.live).length+' đang bật · '+list.length+' phiên</span>'+(list.length>1?'<button class="btn mob" data-side="1">Đổi phiên</button>':'')
     :'<span class="meta">Chưa có phiên nào. Mở phiên mới trong thư mục '+(view.type==='agent'?'<code>agents/'+esc(view.name)+'</code>':'tổng')+' trên app Claude.</span>';
-  if(h===sbarHtml||document.activeElement&&document.activeElement.id==='pick')return;
+  if(h===sbarHtml)return;
   $('sbar').innerHTML=h;sbarHtml=h;
-  const p=$('pick');if(p)p.onchange=()=>{view.sid=p.value;save();rendered='';render(true)};
+  for(const b of $('sbar').querySelectorAll('[data-side]'))b.onclick=()=>document.body.classList.add('open');
 }
 
 // ---- views
@@ -815,8 +878,12 @@ function render(scroll){
 const stat=(n,label)=>'<div class="stat"><b>'+n+'</b><span>'+label+'</span></div>';
 function renderOverview(){
   if(!hub.root)return setInner('<div class="empty">Chưa có thư mục tổng cho các agent.<br><span class="hint">Trong app Claude: bấm nút Tele → 🤖 Agent → nhập đường dẫn thư mục tổng (thư mục chứa <code>agents/</code>).<br>Hoặc mở một phiên trong <code>…/agents/&lt;tên-agent&gt;</code>, mod sẽ tự nhận.</span></div>');
-  const A=hub.agents;
-  let h='<div class="stats">'+stat(A.length,'agent')+stat(A.filter(a=>a.busy).length,'đang làm')+stat(A.filter(a=>a.live).length,'đang bật')+stat(A.reduce((x,a)=>x+a.mail,0),'thư chưa xử lý')+'</div>';
+  const A=hub.agents,T=todo();
+  // First what waits for you: sessions that answered since you last read them.
+  let h='<div class="sec"><b>🔔 Cần bạn xem</b>'+(T.length?'<span class="cnt">'+T.length+'</span><span class="grow"></span><button class="btn" data-allread="1">Đánh dấu đã xem hết</button>':'')+'</div>';
+  h+=T.length?'<div class="flist">'+T.map((x,i)=>'<button class="frow todo" data-todo="'+i+'"><span class="unread"></span><span class="tx"><span class="row1"><b>'+esc(x.s.name)+'</b><span class="meta">'+esc(x.where)+' · '+ago(x.s.at)+'</span></span>'+(x.s.last?'<span class="snip1">'+esc(plain(x.s.last).replace(/\s+/g,' '))+'</span>':'')+'</span></button>').join('')+'</div>'
+    :'<div class="meta wrap">Không có gì mới: phiên nào trả lời xong mà bạn chưa đọc sẽ hiện ở đây.</div>';
+  h+='<div class="stats">'+stat(A.length,'agent')+stat(A.filter(a=>a.busy).length,'đang làm')+stat(A.filter(a=>a.live).length,'đang bật')+stat(A.reduce((x,a)=>x+a.mail,0),'thư chưa xử lý')+'</div>';
   if(!A.length)h+='<div class="empty">Chưa có agent nào.<br><span class="hint">Tạo một thư mục cho mỗi agent trong <code>'+esc(hub.root)+'\\agents\\</code>, rồi mở phiên Claude trong thư mục đó.</span></div>';
   h+='<div class="grid">'+A.map(a=>{
     const pill=a.busy?'<span class="pill busy">Đang làm</span>':a.live?'<span class="pill on">Đang bật</span>':'<span class="pill">Nghỉ</span>';
@@ -824,6 +891,8 @@ function renderOverview(){
     return'<button class="card" data-agent="'+esc(a.name)+'"><div class="row"><b>🤖 '+esc(a.name)+'</b>'+pill+'</div><div class="meta">'+(a.at?'Hoạt động '+ago(a.at)+' · ':a.sessions.length?'Chưa có tin nhắn · ':'')+(a.sessions.length?a.sessions.length+' phiên':'Chưa có phiên nào')+(a.mail?' · 📥 '+a.mail+' thư':'')+'</div>'+(last?'<div class="snip">'+esc(plain(last.last))+'</div>':'')+'</button>'}).join('')+'</div>';
   setInner(h);
   for(const b of $('inner').querySelectorAll('[data-agent]'))b.onclick=()=>go({type:'agent',name:b.dataset.agent});
+  for(const b of $('inner').querySelectorAll('[data-todo]'))b.onclick=()=>{const x=T[Number(b.dataset.todo)];if(x)go(x.v)};
+  for(const b of $('inner').querySelectorAll('[data-allread]'))b.onclick=()=>{for(const s of allSessions())seen[s.sid]=s.n;keep.set('cdm_seen2',seen);rendered='';render(false)};
 }
 async function renderRole(){
   const area=view.type==='agent'?'agent:'+view.name:'root',snap=JSON.stringify(view);
@@ -898,7 +967,11 @@ async function loadHistory(scroll){
 // ---- polling
 async function loadHub(){
   try{const r=await api('/api/hub');show(true);hub=r;
-    for(const s of allSessions())if(!(s.sid in seen))seen[s.sid]=s.n;keep.set('cdm_seen2',seen);
+    // A session met for the first time is read up to now, unless it moved
+    // after the page last looked (it began while the page was closed): then
+    // all of it is new. The very first visit starts with everything read.
+    for(const s of allSessions())if(!(s.sid in seen))seen[s.sid]=lastPoll&&s.at>lastPoll?0:s.n;keep.set('cdm_seen2',seen);
+    if(r.now){lastPoll=r.now;keep.set('cdm_poll',lastPoll)}
     return fixView();
   }catch(e){}
 }
