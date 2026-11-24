@@ -187,28 +187,37 @@ export const register: Register = on => {
           </Box>
         </Box>
 
-        {v.isLoading && !v.projects ? <Text dimColor>Đang tìm dự án…</Text> : null}
+        {v.isLoading && !v.projects ? (
+          <Text dimColor>Đang tìm dự án… (lần đầu có thể mất vài chục giây)</Text>
+        ) : null}
         {v.projects && list.length === 0 ? <Text dimColor>Chưa thấy dự án nào.</Text> : null}
 
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} gap={1}>
-          {rows}
-        </Box>
+        {rows.length > 0 ? (
+          <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} gap={1}>
+            {rows}
+          </Box>
+        ) : null}
 
-        <Box justifyContent="space-between" alignItems="center">
-          <Text dimColor>{v.withContext ? '☑ Kèm ngữ cảnh phiên cũ' : '☐ Kèm ngữ cảnh phiên cũ'}</Text>
+        {/* One button that shows the state and flips it: ☑ on, ☐ off. */}
+        <Box gap={1} alignItems="center">
           <Button
             key="ctx"
-            label={v.withContext ? 'Tắt' : 'Bật'}
+            label={v.withContext ? '☑ Kèm ngữ cảnh phiên cũ' : '☐ Kèm ngữ cảnh phiên cũ'}
             onPress={() => void update($, view, x => ({ ...x, withContext: !x.withContext }))}
           />
+          <Text dimColor>{v.withContext ? 'đang bật' : 'đang tắt'}</Text>
         </Box>
 
         <Box gap={1} alignItems="center">
-          <Button
-            key="open"
-            label={v.isOpening ? 'Đang mở…' : `Mở ${count} dự án`}
-            onPress={() => void openSelected($)}
-          />
+          {count > 0 ? (
+            <Button
+              key="open"
+              label={v.isOpening ? 'Đang mở…' : `Mở ${count} dự án`}
+              onPress={() => void openSelected($)}
+            />
+          ) : (
+            <Text dimColor>Tick ☐ các dự án muốn mở lại.</Text>
+          )}
           {v.note ? <Text color={v.isError ? 'red' : 'green'}>{v.note}</Text> : null}
         </Box>
 
