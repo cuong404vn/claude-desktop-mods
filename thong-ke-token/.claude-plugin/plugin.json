@@ -1,6 +1,6 @@
 {
   "name": "thong-ke-token",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Thống kê token & thời gian hoạt động (phiên này, từ đầu tháng), hạn mức tài khoản / Token & activity stats, account rate limits",
   "author": {
     "name": "Nguyễn Mạnh Cường",

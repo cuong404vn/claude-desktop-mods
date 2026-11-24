@@ -8,3 +8,6 @@ node_modules/
 
 # Files received from Telegram
 **/inbox/
+
+# Hand-off notes (hold conversation text)
+**/handoff/

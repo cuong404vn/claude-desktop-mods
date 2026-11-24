@@ -11,6 +11,9 @@ const tele = atom(
 )
 const teleOpen = atom({ plugin: 'thong-ke-token', key: 'teleOpen' } as const, 0)
 const allDays = atom({ plugin: 'thong-ke-token', key: 'allDays' } as const, false)
+// The mo-lai-du-an mod (read only): its 📂 button shares our row.
+const projOpen = atom({ plugin: 'thong-ke-token', key: 'projOpen' } as const, 0)
+const projReady = atom({ plugin: 'mo-lai-du-an', key: 'ready' } as const, false)
 const teleDot = (b: TeleBridge) =>
   !b.isOn ? '🔴' : b.lastError ? '🔴' : b.pairCode ? '🟡' : '🟢'
 
@@ -129,9 +132,10 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return next(e)
     const { Box, Button } = $.ui.resolve(e)
     const t = await read($, tele).catch(() => null)
+    const hasProjects = await read($, projReady).catch(() => false)
 
-    // One row for both mods; the Tele button bumps teleOpen, which the
-    // tele-bridge mod watches to open its pane.
+    // One row for all the mods; the Tele and 📂 buttons bump a counter that
+    // the tele-bridge / mo-lai-du-an mod watches to open its pane.
     return (
       <Box flexDirection="row" gap={1}>
         <Button
@@ -147,6 +151,13 @@ export const register: Register = on => {
             key="open-tele"
             label={`${teleDot(t)} Tele`}
             onPress={() => void update($, teleOpen, n => (n ?? 0) + 1)}
+          />
+        ) : null}
+        {hasProjects ? (
+          <Button
+            key="open-projects"
+            label="📂 Dự án"
+            onPress={() => void update($, projOpen, n => (n ?? 0) + 1)}
           />
         ) : null}
       </Box>

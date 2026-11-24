@@ -35,8 +35,12 @@ declare module 'claude-code' {
       teleOpen: number
       // The daily chart shows the whole month instead of the last 7 days.
       allDays: boolean
+      // Bumped by the 📂 button; the mo-lai-du-an mod opens its pane.
+      projOpen: number
     }
     // null here: unset until that mod has loaded (or when it is not installed).
     'tele-bridge': { bridge: Shaped<TeleBridge | null> }
+    // True once the mo-lai-du-an mod has loaded (read only, to show 📂).
+    'mo-lai-du-an': { ready: boolean }
   }
 }

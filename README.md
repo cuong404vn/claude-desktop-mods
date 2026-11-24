@@ -15,7 +15,9 @@ Tác giả: **Nguyễn Mạnh Cường** · Website: **[vidtools.net](https://vi
 | **`thong-ke-token`** | Nút **📊 Thống kê token** trên ô chat. Mở pane xem: token và thời gian hoạt động của phiên này, của cả tháng (tính từ ngày 1), số phiên, chi phí ước tính, biểu đồ token theo ngày (7 ngày hoặc cả tháng), hạn mức 5 giờ / 7 ngày của tài khoản. |
 | **`tele-bridge`** | Nút **Tele** (🟢 phiên này đang bật · 🔴 tắt/lỗi). Bật cho một hay nhiều phiên, chọn phiên trên Telegram bằng nút bấm, nhắn tin → vào thẳng phiên đó; Claude làm xong → câu trả lời gửi lại Telegram. Dùng khi bạn ra ngoài, không ngồi máy. |
 
-Hai nút nằm chung một hàng phía trên ô chat.
+| **`mo-lai-du-an`** | Nút **📂 Dự án**. Liệt kê các thư mục dự án Claude Code từng làm trên máy (kể cả do tài khoản khác làm), tick chọn rồi bấm **Mở**: Claude mở lại mỗi dự án thành một phiên mới đúng thư mục, đúng tên, kèm bản tóm tắt phiên cũ. Hợp khi nhiều nhân viên, mỗi người một tài khoản, làm chung dự án trên cùng máy. |
+
+Các nút nằm chung một hàng phía trên ô chat.
 
 ## Mod này có an toàn, có được phép không?
 
@@ -132,6 +134,8 @@ Author: **Nguyễn Mạnh Cường** · Website: **[vidtools.net](https://vidtoo
 | --- | --- |
 | **`thong-ke-token`** | A **📊 Thống kê token** (token stats) button. Opens a pane with tokens and active time for this session and month-to-date, session count, estimated cost, a daily token chart (last 7 days or the whole month), and your account's 5-hour / 7-day rate limits. |
 | **`tele-bridge`** | A **Tele** button (🟢 this session is on · 🔴 off/error). Turn it on in one or more sessions, pick a session on Telegram with buttons, and your messages go straight into it; when Claude finishes, the answer comes back to Telegram. For when you're away from your computer. |
+
+| **`mo-lai-du-an`** | A **📂 Dự án** (projects) button. Lists the project folders Claude Code has worked in on this computer (including by another account); tick some and click **Mở** (open): Claude reopens each as a new session in its folder, under its old name, with a summary of the previous session. Useful when several employees, each with their own account, share projects on one computer. |
 
 The UI text is in Vietnamese.
 

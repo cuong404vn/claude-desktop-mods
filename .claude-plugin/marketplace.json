@@ -22,6 +22,15 @@
         "name": "Nguyễn Mạnh Cường",
         "url": "https://vidtools.net"
       }
+    },
+    {
+      "name": "mo-lai-du-an",
+      "source": "./mo-lai-du-an",
+      "description": "Mở lại hàng loạt phiên dự án kèm ngữ cảnh cũ / Reopen project sessions with their previous context",
+      "author": {
+        "name": "Nguyễn Mạnh Cường",
+        "url": "https://vidtools.net"
+      }
     }
   ],
   "metadata": {

@@ -1,0 +1,10 @@
+{
+  "name": "mo-lai-du-an",
+  "version": "1.0.0",
+  "description": "Mở lại hàng loạt phiên dự án (kèm ngữ cảnh cũ) ở tài khoản đang đăng nhập / Reopen project sessions with their previous context",
+  "author": { "name": "Nguyễn Mạnh Cường", "url": "https://vidtools.net" },
+  "homepage": "https://github.com/cuong404vn/claude-desktop-mods",
+  "repository": "https://github.com/cuong404vn/claude-desktop-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
